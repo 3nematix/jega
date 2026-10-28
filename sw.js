@@ -1,5 +1,6 @@
-/* Jėga service worker — offline app shell + runtime-cached exercise thumbnails */
-const VERSION = 'jega-v1';
+/* Jėga service worker — network-first app shell (always fresh online),
+   cache fallback offline, runtime-cached exercise thumbnails. */
+const VERSION = 'jega-v2';
 const SHELL = VERSION + '-shell';
 const THUMBS = VERSION + '-thumbs';
 
@@ -34,7 +35,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Exercise thumbnails: cache-first, store on first view so they work offline later.
+  // Exercise thumbnails: cache-first, stored on first view so they work offline later.
   if (url.pathname.includes('/assets/thumbs/')) {
     e.respondWith(
       caches.open(THUMBS).then(async (cache) => {
@@ -52,24 +53,29 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Navigations: serve cached app shell (offline-first SPA).
+  // Navigations: network-first, fall back to cached shell when offline.
   if (req.mode === 'navigate') {
     e.respondWith(
-      caches.match('./index.html').then((hit) => hit || fetch(req))
+      fetch(req).then((res) => {
+        const copy = res.clone();
+        caches.open(SHELL).then((c) => c.put('./index.html', copy));
+        return res;
+      }).catch(() => caches.match('./index.html'))
     );
     return;
   }
 
-  // Everything else same-origin: cache-first, fall back to network.
+  // Other same-origin assets (app code, icons): network-first so updates apply,
+  // cache fallback for offline.
   if (url.origin === self.location.origin) {
     e.respondWith(
-      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      fetch(req).then((res) => {
         if (res && res.ok) {
           const copy = res.clone();
           caches.open(SHELL).then((c) => c.put(req, copy));
         }
         return res;
-      }).catch(() => hit))
+      }).catch(() => caches.match(req))
     );
   }
 });
