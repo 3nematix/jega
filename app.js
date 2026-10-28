@@ -27,7 +27,7 @@ function restLabel(s){ for(var i=0;i<RESTS.length;i++) if(RESTS[i][0]===s) retur
 var KEY = 'jega.db.v1';
 var db = { folders: [], routines: [] };
 function uid(){ return Math.random().toString(36).slice(2,9); }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){} }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); localStorage.setItem('jega.updatedAt', String(Date.now())); }catch(e){} schedulePush(); }
 function load(){
   try{ var raw = localStorage.getItem(KEY); if(raw){ db = JSON.parse(raw); return true; } }catch(e){}
   return false;
@@ -317,6 +317,9 @@ function render(){
 function renderHome(){
   var h = topbar({ title:'Routines', icon:{name:'theme',act:'theme'}, menu:true });
   h += '<div class="screen">';
+  if(CLOUD_ON && cloudUser){
+    h += '<div class="elapsed" style="margin:6px 2px 10px">'+svg('check')+'Sinchronizuojama · '+esc(cloudUser.email||'')+'</div>';
+  }
   // resume active workout
   if(session){
     var done = session.exercises.filter(function(e){return e.finished;}).length;
@@ -805,12 +808,21 @@ document.addEventListener('click', function(ev){
       break;
     }
     case 'menu': {
-      openSheet('Menu', [
+      var mitems = [
         { label:'Workout history', icon:'hist', onClick:function(){ go('history'); } },
-        { label:'Load 5-day program', icon:'doc', onClick:loadProgram },
-        { label:'Backup data (export)', icon:'download', onClick:exportData },
-        { label:'Restore from backup', icon:'upload', onClick:importData }
-      ]);
+        { label:'Load 5-day program', icon:'doc', onClick:loadProgram }
+      ];
+      if(CLOUD_ON){
+        if(cloudUser){
+          mitems.push({ label:'Sync now', icon:'download', onClick:cloudPull });
+          mitems.push({ label:'Sign out ('+(cloudUser.email||'')+')', icon:'upload', onClick:cloudSignOut });
+        } else {
+          mitems.push({ label:'Sign in to sync', icon:'upload', onClick:openAuthDialog });
+        }
+      }
+      mitems.push({ label:'Backup data (export)', icon:'download', onClick:exportData });
+      mitems.push({ label:'Restore from backup', icon:'upload', onClick:importData });
+      openSheet('Menu', mitems);
       break;
     }
     case 'toggleFolder': {
@@ -985,5 +997,86 @@ document.addEventListener('change', function(ev){
   var i = +el.getAttribute('data-i'); if(draft.exercises[i]) draft.exercises[i].rest = +el.value;
 });
 
+/* --------------------------------------------------------- CLOUD SYNC */
+var CLOUD = { url:'__SUPABASE_URL__', key:'__SUPABASE_ANON_KEY__' };
+var CLOUD_ON = /^https:\/\/[a-z0-9]+\.supabase\.(co|in)/.test(CLOUD.url);
+var supa = null, cloudUser = null, pushTimer = null, pushing = false;
+
+function cloudUpdatedAt(){ try{ return +localStorage.getItem('jega.updatedAt') || 0; }catch(e){ return 0; } }
+function setCloudUpdatedAt(ms){ try{ localStorage.setItem('jega.updatedAt', String(ms)); }catch(e){} }
+
+function cloudInit(){
+  if(!CLOUD_ON || !window.supabase) return;
+  try{ supa = window.supabase.createClient(CLOUD.url, CLOUD.key, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false } }); }catch(e){ supa = null; return; }
+  supa.auth.onAuthStateChange(function(ev, sess){
+    cloudUser = sess ? sess.user : null;
+    if((ev==='SIGNED_IN' || ev==='INITIAL_SESSION') && cloudUser) cloudPull();
+    if(top().view==='home'){ try{ renderHome(); }catch(e){} }
+  });
+}
+function schedulePush(){
+  if(!CLOUD_ON || !supa || !cloudUser) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(function(){ cloudPush(); }, 1200);
+}
+function cloudPull(){
+  if(!supa || !cloudUser) return;
+  supa.from('user_data').select('data').eq('user_id', cloudUser.id).maybeSingle().then(function(r){
+    if(r.error){ return; }
+    var remote = r.data && r.data.data;
+    if(remote && remote.db && (remote.updatedAt||0) > cloudUpdatedAt()){
+      db = remote.db; if(!db.history) db.history = [];
+      try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){}
+      setCloudUpdatedAt(remote.updatedAt);
+      render(); toast('Atsiųsta iš debesies');
+    } else {
+      cloudPush();
+    }
+  }, function(){});
+}
+function cloudPush(){
+  if(!supa || !cloudUser) return;
+  var payload = { user_id: cloudUser.id, data: { db: db, updatedAt: cloudUpdatedAt() || Date.now() }, updated_at: new Date().toISOString() };
+  supa.from('user_data').upsert(payload).then(function(){}, function(){});
+}
+function cloudSignIn(email, pass, mode){
+  if(!supa){ toast('Debesis neprijungtas'); return; }
+  var pr = (mode==='signup')
+    ? supa.auth.signUp({ email:email, password:pass })
+    : supa.auth.signInWithPassword({ email:email, password:pass });
+  pr.then(function(r){
+    if(r.error){ toast(r.error.message || 'Nepavyko prisijungti'); return; }
+    if(mode==='signup' && !(r.data && r.data.session)){ toast('Patvirtink el. paštą ir prisijunk'); return; }
+    toast(mode==='signup' ? 'Paskyra sukurta' : 'Prisijungta');
+  }, function(){ toast('Tinklo klaida'); });
+}
+function cloudSignOut(){ if(supa) supa.auth.signOut().then(function(){ cloudUser=null; toast('Atsijungta'); if(top().view==='home') renderHome(); }); }
+
+function openAuthDialog(){
+  var h = '<div class="dlg-back" data-close="1"><div class="dlg">'
+    + '<h3>Prisijungti</h3><p>Sinchronizuok duomenis tarp įrenginių.</p>'
+    + '<input class="input" id="authEmail" type="email" placeholder="El. paštas" autocomplete="username" style="margin-bottom:10px">'
+    + '<input class="input" id="authPass" type="password" placeholder="Slaptažodis (min 6)" autocomplete="current-password" style="margin-bottom:16px">'
+    + '<div class="btn-row"><button class="btn ghost" data-auth="signup">Sukurti</button>'
+    + '<button class="btn primary" data-auth="signin">Prisijungti</button></div></div></div>';
+  layer.innerHTML = h;
+  var backEl = layer.querySelector('.dlg-back');
+  requestAnimationFrame(function(){ backEl.classList.add('show'); });
+  var em = document.getElementById('authEmail'); if(em) em.focus();
+  backEl.addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-auth]');
+    if(b){
+      var email = (document.getElementById('authEmail').value||'').trim();
+      var pass = document.getElementById('authPass').value||'';
+      if(!email || pass.length<6){ toast('Įvesk el. paštą ir slaptažodį (min 6)'); return; }
+      backEl.classList.remove('show'); setTimeout(closeLayer, 180);
+      cloudSignIn(email, pass, b.getAttribute('data-auth')==='signup' ? 'signup' : 'signin');
+      return;
+    }
+    if(ev.target.getAttribute('data-close')){ backEl.classList.remove('show'); setTimeout(closeLayer, 180); }
+  });
+}
+
 render();
+cloudInit();
 })();
