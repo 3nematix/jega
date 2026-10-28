@@ -77,12 +77,15 @@ function startSession(routineId){
   };
   saveSession();
 }
-function lastTopKg(exId){
-  for(var i=0;i<db.history.length;i++){
-    var en = (db.history[i].entries||[]).filter(function(e){return e.exId===exId && e.topKg;})[0];
-    if(en) return en.topKg;
-  }
-  return null;
+function bestTopKg(exId){
+  var best = null;
+  db.history.forEach(function(h){ (h.entries||[]).forEach(function(en){
+    if(en.exId===exId && en.topKg){
+      var v = parseFloat(String(en.topKg).replace(',','.'));
+      if(!isNaN(v) && (best===null || v>best)) best = v;
+    }
+  }); });
+  return best;
 }
 function lastDone(routineId){
   var h = db.history.filter(function(x){return x.routineId===routineId;})[0];
@@ -475,15 +478,16 @@ function libRow(e, picker){
 function renderExercise(exId){
   var e = byId[exId]; if(!e) return back();
   var h = topbar({ title:e.name, sub:true, back:true });
-  h += '<div class="screen">';
-  var media;
+  h += '<div class="screen flush">';
+  var media, heroCls='hero', heroAttr='';
   if(e.video){
-    media = '<video src="'+esc(e.video)+'"'+(e.thumb?(' poster="'+esc(e.thumb)+'"'):'')
-      + ' autoplay loop muted playsinline preload="auto"></video>';
+    heroCls = 'hero hasvid';
+    if(e.thumb) heroAttr = " style=\"background-image:url('"+e.thumb+"')\"";
+    media = '<video src="'+esc(e.video)+'" autoplay loop muted playsinline preload="auto" oncanplay="this.classList.add(\'ready\')"></video>';
   } else {
     media = e.thumb? '<img src="'+esc(e.thumb)+'" alt="">' : '<div style="color:var(--muted)">No image</div>';
   }
-  h += '<div class="hero">'+media+'</div>';
+  h += '<div class="'+heroCls+'"'+heroAttr+'>'+media+'</div>';
   h += '<div class="meta">'
     + '<div class="row"><span class="k">Equipment</span><span class="v">'+esc(EQUIP[e.equipment]||e.equipment)+'</span></div>'
     + '<div class="row"><span class="k">Primary Muscle</span><span class="v">'+esc(MUSCLE[e.primary]||e.primary)+'</span></div>'
@@ -515,13 +519,13 @@ function renderSession(){
      + '<div class="progmeta tnum">'+doneCount+'/'+total+'</div></div>';
   h += '<div class="elapsed">'+svg('clock')+'<span id="elapsed">'+fmtClock((Date.now()-session.startedAt)/1000)+'</span> elapsed</div>';
   session.exercises.forEach(function(x,i){
-    var e = byId[x.exId]; var open = sessOpen===i; var last = lastTopKg(x.exId);
+    var e = byId[x.exId]; var open = sessOpen===i; var last = bestTopKg(x.exId);
     h += '<div class="card scard'+(x.finished?' done':'')+'">';
     h += '<div class="sc-head">'+thumb(e,'thumb sm')
       + '<div class="sc-body" data-act="toggleOpen" data-i="'+i+'">'
       + '<div class="sc-name">'+esc(e?e.name:'Unknown')+'</div>'
       + '<div class="sc-sub tnum">'+x.done+'/'+x.target+' sets'+(x.topKg?(' · '+esc(x.topKg)+' kg'):'')+'</div>'
-      + ((last && !x.topKg)?('<div class="sc-last">Last: '+esc(last)+' kg</div>'):'')
+      + ((last!=null && !x.topKg)?('<div class="sc-last">Best: '+esc(last)+' kg</div>'):'')
       + '</div>'
       + '<button class="donebtn'+(x.finished?' on':'')+'" data-act="toggleDone" data-i="'+i+'" aria-label="Done">'+svg('check')+'</button></div>';
     if(open){
@@ -604,7 +608,7 @@ function beep(){
 /* --------------------------------------------------------- HISTORY view */
 function renderHistory(){
   var h = topbar({ title:'History', sub:true, back:true });
-  h += '<div class="screen">';
+  h += '<div class="screen flush">';
   if(!db.history.length){
     h += '<div class="empty">'+svg('hist')+'<div>No workouts logged yet.<br>Open a routine and press Start.</div></div>';
   }

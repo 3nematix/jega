@@ -1,8 +1,8 @@
 /* Jėga service worker — network-first app shell (always fresh online),
    cache fallback offline, runtime-cached exercise thumbnails. */
-const VERSION = 'jega-v2';
+const VERSION = 'jega-v3';
 const SHELL = VERSION + '-shell';
-const THUMBS = VERSION + '-thumbs';
+const THUMBS = VERSION + '-media';
 
 const SHELL_ASSETS = [
   './',
@@ -35,8 +35,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Exercise thumbnails: cache-first, stored on first view so they work offline later.
-  if (url.pathname.includes('/assets/thumbs/')) {
+  // Exercise thumbnails and videos: cache-first, stored on first view so they work offline later.
+  if (url.pathname.includes('/assets/thumbs/') || url.pathname.includes('/assets/videos/')) {
     e.respondWith(
       caches.open(THUMBS).then(async (cache) => {
         const hit = await cache.match(req);
