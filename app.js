@@ -998,7 +998,7 @@ document.addEventListener('change', function(ev){
 });
 
 /* --------------------------------------------------------- CLOUD SYNC */
-var CLOUD = { url:'__SUPABASE_URL__', key:'__SUPABASE_ANON_KEY__' };
+var CLOUD = { url:'https://uaehcpbxulqhgqnczqha.supabase.co', key:'sb_publishable_GIFh0fn65FGxp8d8MB9FjA_1Opaa-EW' };
 var CLOUD_ON = /^https:\/\/[a-z0-9]+\.supabase\.(co|in)/.test(CLOUD.url);
 var supa = null, cloudUser = null, pushTimer = null, pushing = false;
 
