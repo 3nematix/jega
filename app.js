@@ -359,9 +359,13 @@ function renderHome(){
   app.innerHTML = h;
 }
 function routineCard(r){
+  var playBtn = (r.exercises && r.exercises.length)
+    ? '<span class="rc-play" data-act="start" data-id="'+r.id+'" data-stop="1" aria-label="Start">'+svg('play')+'</span>'
+    : '';
   return '<button class="rcard" data-act="openRoutine" data-id="'+r.id+'">'
     + '<div class="rc-body"><div class="rc-title">'+esc(r.name)+'</div>'
     + '<div class="rc-sub">'+esc(routineSub(r))+'</div></div>'
+    + playBtn
     + '<span class="rc-more iconbtn" data-act="routineMenu" data-id="'+r.id+'" data-stop="1">'+svg('more')+'</span></button>';
 }
 
@@ -527,15 +531,14 @@ function renderExercise(exId){
   var e = byId[exId]; if(!e) return back();
   var h = topbar({ title:e.name, sub:true, back:true });
   h += '<div class="screen flush">';
-  var media, heroCls='hero', heroAttr='';
+  var media, heroCls='hero';
   if(e.video){
     heroCls = 'hero hasvid';
-    if(e.thumb) heroAttr = " style=\"background-image:url('"+e.thumb+"')\"";
-    media = '<video src="'+esc(e.video)+'" autoplay loop muted playsinline preload="auto" oncanplay="this.classList.add(\'ready\')"></video>';
+    media = '<video src="'+esc(e.video)+'" autoplay loop muted playsinline preload="auto"></video>';
   } else {
     media = e.thumb? '<img src="'+esc(e.thumb)+'" alt="">' : '<div style="color:var(--muted)">No image</div>';
   }
-  h += '<div class="'+heroCls+'"'+heroAttr+'>'+media+'</div>';
+  h += '<div class="'+heroCls+'">'+media+'</div>';
   h += '<div class="meta">'
     + '<div class="row"><span class="k">Equipment</span><span class="v">'+esc(EQUIP[e.equipment]||e.equipment)+'</span></div>'
     + '<div class="row"><span class="k">Primary Muscle</span><span class="v">'+esc(MUSCLE[e.primary]||e.primary)+'</span></div>'
@@ -609,16 +612,27 @@ function pip(i,k){
 }
 function finishSession(){
   if(!session) return reset('home');
-  openDialog({ title:'Finish workout?', desc:'Saves what you have done to your history.', input:false, okLabel:'Finish', onOk:function(){
-    var doneCount = session.exercises.filter(function(e){return e.finished;}).length;
-    db.history.unshift({
-      id:uid(), routineId:session.routineId, routineName:session.routineName,
-      date:Date.now(), durationSec:Math.round((Date.now()-session.startedAt)/1000),
-      exercisesDone:doneCount, exercisesTotal:session.exercises.length,
-      entries: session.exercises.map(function(x){ var e=byId[x.exId]; return { exId:x.exId, name:e?e.name:'', setsDone:x.done, target:x.target, topKg:x.topKg, finished:x.finished }; })
-    });
-    save(); clearSession(); hideRest(); sessOpen=null;
-    reset('home'); go('history'); toast('Workout saved 💪');
+  openSheet('Baigti treniruotę?', [
+    { label:'Baigti ir išsaugoti', icon:'check', onClick:doFinishSave },
+    { label:'Atmesti (nesaugoti)', icon:'trash', danger:true, onClick:doDiscardSession },
+    { label:'Atšaukti', icon:'close', onClick:function(){} }
+  ]);
+}
+function doFinishSave(){
+  if(!session) return reset('home');
+  var doneCount = session.exercises.filter(function(e){return e.finished;}).length;
+  db.history.unshift({
+    id:uid(), routineId:session.routineId, routineName:session.routineName,
+    date:Date.now(), durationSec:Math.round((Date.now()-session.startedAt)/1000),
+    exercisesDone:doneCount, exercisesTotal:session.exercises.length,
+    entries: session.exercises.map(function(x){ var e=byId[x.exId]; return { exId:x.exId, name:e?e.name:'', setsDone:x.done, target:x.target, topKg:x.topKg, finished:x.finished }; })
+  });
+  save(); clearSession(); hideRest(); sessOpen=null;
+  reset('home'); go('history'); toast('Treniruotė išsaugota 💪');
+}
+function doDiscardSession(){
+  openDialog({ title:'Atmesti treniruotę?', desc:'Šios treniruotės duomenys nebus išsaugoti.', input:false, okLabel:'Atmesti', danger:true, onOk:function(){
+    clearSession(); hideRest(); sessOpen=null; reset('home'); toast('Treniruotė atmesta');
   }});
 }
 
