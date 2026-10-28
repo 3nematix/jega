@@ -1,6 +1,6 @@
 /* Jėga service worker — network-first app shell (always fresh online),
    cache fallback offline, runtime-cached exercise thumbnails. */
-const VERSION = 'jega-v4';
+const VERSION = 'jega-v5';
 const SHELL = VERSION + '-shell';
 const THUMBS = VERSION + '-media';
 
@@ -13,7 +13,8 @@ const SHELL_ASSETS = [
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/apple-touch-icon.png',
-  './assets/icon.svg'
+  './assets/icon.svg',
+  './assets/fonts/figtree.woff2'
 ];
 
 self.addEventListener('install', (e) => {

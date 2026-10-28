@@ -316,10 +316,11 @@ function render(){
 /* -- Home -- */
 function renderHome(){
   var h = topbar({ title:'Routines', icon:{name:'theme',act:'theme'}, menu:true });
-  h += '<div class="screen">';
+  h += '<div class="screen flush">';
   if(CLOUD_ON && cloudUser){
     h += '<div class="elapsed" style="margin:6px 2px 10px">'+svg('check')+'Sinchronizuojama · '+esc(cloudUser.email||'')+'</div>';
   }
+  h += '<button class="newrt" data-act="newRoutine"><span class="nr-ic">'+svg('plus')+'</span>Nauja treniruotė</button>';
   // resume active workout
   if(session){
     var done = session.exercises.filter(function(e){return e.finished;}).length;
@@ -351,22 +352,21 @@ function renderHome(){
   }
   un.forEach(function(r){ h += routineCard(r); });
   h += '</div>';
-  // footer actions
-  h += '<div class="sticky-foot"><div class="inner"><div class="btn-row">'
-    + '<button class="btn primary" data-act="newRoutine">'+svg('plus')+'New Routine</button>'
-    + '<button class="btn" data-act="newFolder">'+svg('folderPlus')+'Folder</button>'
-    + '</div></div></div>';
   app.innerHTML = h;
 }
 function routineCard(r){
-  var playBtn = (r.exercises && r.exercises.length)
-    ? '<span class="rc-play" data-act="start" data-id="'+r.id+'" data-stop="1" aria-label="Start">'+svg('play')+'</span>'
-    : '';
-  return '<button class="rcard" data-act="openRoutine" data-id="'+r.id+'">'
-    + '<div class="rc-body"><div class="rc-title">'+esc(r.name)+'</div>'
-    + '<div class="rc-sub">'+esc(routineSub(r))+'</div></div>'
-    + playBtn
-    + '<span class="rc-more iconbtn" data-act="routineMenu" data-id="'+r.id+'" data-stop="1">'+svg('more')+'</span></button>';
+  var has = r.exercises && r.exercises.length;
+  var startBtn = has
+    ? '<button class="rc2-start" data-act="start" data-id="'+r.id+'">'+svg('play')+'Pradėti</button>'
+    : '<button class="rc2-start edit" data-act="edit" data-id="'+r.id+'">'+svg('edit')+'Redaguoti</button>';
+  return '<div class="rcard2">'
+    + '<div class="rc2-head">'
+    + '<button class="rc2-title" data-act="openRoutine" data-id="'+r.id+'">'+esc(r.name)+'</button>'
+    + '<span class="rc2-more iconbtn" data-act="routineMenu" data-id="'+r.id+'" data-stop="1">'+svg('more')+'</span>'
+    + '</div>'
+    + '<button class="rc2-sub" data-act="openRoutine" data-id="'+r.id+'">'+esc(routineSub(r))+'</button>'
+    + startBtn
+    + '</div>';
 }
 
 /* -- Routine view -- */
@@ -824,6 +824,7 @@ document.addEventListener('click', function(ev){
     case 'menu': {
       var mitems = [
         { label:'Workout history', icon:'hist', onClick:function(){ go('history'); } },
+        { label:'New folder', icon:'folderPlus', onClick:function(){ openDialog({ title:'New Folder', placeholder:'Folder name', okLabel:'Create', onOk:function(v){ if(!v) return; db.folders.push({id:uid(), name:v, collapsed:false}); save(); render(); } }); } },
         { label:'Load 5-day program', icon:'doc', onClick:loadProgram }
       ];
       if(CLOUD_ON){
