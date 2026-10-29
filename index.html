@@ -315,6 +315,24 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .authfield{margin-bottom:12px;text-align:left}
 .authbtn{margin-top:6px}
 .authtoggle{margin-top:10px;border:none;background:transparent;color:var(--accent);font-weight:700}
+/* ---- bottom tab bar ---- */
+.screen.tabbed{padding-bottom:calc(96px + env(safe-area-inset-bottom,0))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:center;padding:0 12px env(safe-area-inset-bottom,0);pointer-events:none}
+.tabbar .inner{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px;margin-bottom:10px;box-shadow:0 8px 28px rgba(0,0,0,.22);pointer-events:auto}
+.tabbar .tb{display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:700;padding:7px 18px;border-radius:999px;min-width:82px}
+.tabbar .tb.active{color:var(--accent);background:var(--accent-weak)}
+.tabbar .tb svg{width:23px;height:23px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+/* ---- profile ---- */
+.profhead{display:flex;align-items:center;gap:16px;margin-top:10px}
+.avatar{width:72px;height:72px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;flex:none}
+.prof-id{min-width:0}
+.prof-name{font-size:19px;font-weight:700;word-break:break-word}
+.prof-since{color:var(--muted);font-size:13.5px;margin-top:3px}
+.prow2{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:10px;color:var(--ink);font-weight:600;font-size:15.5px;box-shadow:var(--shadow)}
+.prow2>svg{width:21px;height:21px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none;color:var(--muted)}
+.prow2 span:not(.pchev){flex:1;min-width:0}
+.prow2 .pchev svg{width:18px;height:18px;stroke:var(--line-strong);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.prow2.danger{color:#e5484d}.prow2.danger>svg{color:#e5484d}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>

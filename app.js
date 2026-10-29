@@ -185,9 +185,22 @@ var I = {
   play:'<path d="M7 5l12 7-12 7z"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   hist:'<path d="M3.5 9a9 9 0 112 7.5"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/>',
-  flag:'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>'
+  flag:'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/>',
+  chart:'<path d="M3 20h18"/><path d="M6 20v-6M11 20V7M16 20v-9"/>',
+  chevR:'<path d="M9 6l6 6-6 6"/>'
 };
 function svg(name, cls){ return '<svg viewBox="0 0 24 24"'+(cls?(' class="'+cls+'"'):'')+'>'+I[name]+'</svg>'; }
+function bottomBar(active){
+  function tab(view, icon, label){
+    return '<button class="tb'+(active===view?' active':'')+'" data-act="tab" data-view="'+view+'">'+svg(icon)+'<span>'+label+'</span></button>';
+  }
+  return '<div class="tabbar"><div class="inner">'
+    + tab('home','dumbbell','Treniruotės')
+    + tab('history','chart','Istorija')
+    + tab('profile','user','Profilis')
+    + '</div></div>';
+}
 
 /* exercise thumb */
 function thumb(e, cls){
@@ -315,16 +328,14 @@ function render(){
   if(t.view==='exercise') return renderExercise(t.exId);
   if(t.view==='session') return renderSession();
   if(t.view==='history') return renderHistory();
+  if(t.view==='profile') return renderProfile();
   renderHome();
 }
 
 /* -- Home -- */
 function renderHome(){
-  var h = topbar({ title:'Routines', icon:{name:'theme',act:'theme'}, menu:true });
-  h += '<div class="screen flush">';
-  if(CLOUD_ON && cloudUser){
-    h += '<div class="elapsed" style="margin:6px 2px 10px">'+svg('check')+'Sinchronizuojama · '+esc(cloudUser.email||'')+'</div>';
-  }
+  var h = topbar({ title:'Treniruotės', icon:{name:'theme',act:'theme'}, menu:true });
+  h += '<div class="screen tabbed">';
   h += '<button class="newrt" data-act="newRoutine"><span class="nr-ic">'+svg('plus')+'</span>Nauja treniruotė</button>';
   // resume active workout
   if(session){
@@ -357,6 +368,7 @@ function renderHome(){
   }
   un.forEach(function(r){ h += routineCard(r); });
   h += '</div>';
+  h += bottomBar('home');
   app.innerHTML = h;
 }
 function routineCard(r){
@@ -694,7 +706,7 @@ function doFinishSave(){
     entries: session.exercises.map(function(x){ var e=byId[x.exId]; return { exId:x.exId, name:e?e.name:'', setsDone:x.done, target:x.target, topKg:x.topKg, finished:x.finished }; })
   });
   save(); clearSession(); hideRest(); sessOpen=null;
-  reset('home'); go('history'); toast('Treniruotė išsaugota 💪');
+  reset('history'); toast('Treniruotė išsaugota 💪');
 }
 function doDiscardSession(){
   openDialog({ title:'Atmesti treniruotę?', desc:'Šios treniruotės duomenys nebus išsaugoti.', input:false, okLabel:'Atmesti', danger:true, onOk:function(){
@@ -735,10 +747,10 @@ function beep(){
 
 /* --------------------------------------------------------- HISTORY view */
 function renderHistory(){
-  var h = topbar({ title:'History', sub:true, back:true });
-  h += '<div class="screen flush">';
+  var h = topbar({ title:'Istorija' });
+  h += '<div class="screen tabbed">';
   if(!db.history.length){
-    h += '<div class="empty">'+svg('hist')+'<div>No workouts logged yet.<br>Open a routine and press Start.</div></div>';
+    h += '<div class="empty" style="padding-top:60px">'+svg('hist')+'<div>Dar nėra treniruočių.<br>Atidaryk treniruotę ir paspausk Pradėti.</div></div>';
   } else {
     var now=Date.now(), wk=now-7*864e5, mo=now-30*864e5;
     var wkN=db.history.filter(function(x){return x.date>=wk;}).length;
@@ -758,6 +770,35 @@ function renderHistory(){
       + '</div></button>';
   });
   h += '</div>';
+  h += bottomBar('history');
+  app.innerHTML = h;
+}
+/* --------------------------------------------------------- PROFILE view */
+function renderProfile(){
+  var email = (cloudUser && cloudUser.email) || '—';
+  var initial = (email.charAt(0)||'?').toUpperCase();
+  var created = (cloudUser && cloudUser.created_at) ? new Date(cloudUser.created_at) : null;
+  var since = (created && !isNaN(created)) ? created.toLocaleDateString(undefined,{month:'long',year:'numeric'}) : null;
+  var now=Date.now(), wk=now-7*864e5;
+  var workouts = db.history.length, routines = db.routines.length;
+  var thisWeek = db.history.filter(function(x){return x.date>=wk;}).length;
+  var h = topbar({ title:'Profilis', icon:{name:'theme',act:'theme'} });
+  h += '<div class="screen tabbed">';
+  h += '<div class="profhead"><div class="avatar">'+esc(initial)+'</div>'
+    + '<div class="prof-id"><div class="prof-name">'+esc(email)+'</div>'
+    + (since?('<div class="prof-since">Narys nuo '+esc(since)+'</div>'):'')+'</div></div>';
+  h += '<div class="stats" style="margin:18px 0 22px">'
+    + '<div class="stat"><div class="n tnum">'+workouts+'</div><div class="l">Treniruotės</div></div>'
+    + '<div class="stat"><div class="n tnum">'+routines+'</div><div class="l">Rutinos</div></div>'
+    + '<div class="stat"><div class="n tnum">'+thisWeek+'</div><div class="l">Šią savaitę</div></div></div>';
+  h += '<div class="eyebrow">Daugiau</div>';
+  h += '<button class="prow2" data-act="tab" data-view="history">'+svg('hist')+'<span>Istorija</span><span class="pchev">'+svg('chevR')+'</span></button>';
+  h += '<button class="prow2" data-act="browseLib">'+svg('dumbbell')+'<span>Pratimų biblioteka</span><span class="pchev">'+svg('chevR')+'</span></button>';
+  h += '<div class="eyebrow">Nustatymai</div>';
+  h += '<button class="prow2" data-act="theme">'+svg('theme')+'<span>Tema</span><span class="pchev">'+svg('chevR')+'</span></button>';
+  if(CLOUD_ON && cloudUser) h += '<button class="prow2 danger" data-act="signout">'+svg('upload')+'<span>Atsijungti</span></button>';
+  h += '</div>';
+  h += bottomBar('profile');
   app.innerHTML = h;
 }
 function histOpen(id){
@@ -897,16 +938,14 @@ document.addEventListener('click', function(ev){
     }
     case 'menu': {
       var mitems = [
-        { label:'Workout history', icon:'hist', onClick:function(){ go('history'); } },
-        { label:'New folder', icon:'folderPlus', onClick:function(){ openDialog({ title:'New Folder', placeholder:'Folder name', okLabel:'Create', onOk:function(v){ if(!v) return; db.folders.push({id:uid(), name:v, collapsed:false}); save(); render(); } }); } },
-        { label:'Load 5-day program', icon:'doc', onClick:loadProgram }
+        { label:'Naujas aplankas', icon:'folderPlus', onClick:function(){ openDialog({ title:'Naujas aplankas', placeholder:'Aplanko pavadinimas', okLabel:'Sukurti', onOk:function(v){ if(!v) return; db.folders.push({id:uid(), name:v, collapsed:false}); save(); render(); } }); } },
+        { label:'Įkelti 5 dienų programą', icon:'doc', onClick:loadProgram }
       ];
       if(CLOUD_ON && cloudUser){
-        mitems.push({ label:'Sync now', icon:'download', onClick:cloudPull });
-        mitems.push({ label:'Atsijungti ('+(cloudUser.email||'')+')', icon:'upload', onClick:cloudSignOut });
+        mitems.push({ label:'Sinchronizuoti dabar', icon:'download', onClick:cloudPull });
       }
-      mitems.push({ label:'Backup data (export)', icon:'download', onClick:exportData });
-      mitems.push({ label:'Restore from backup', icon:'upload', onClick:importData });
+      mitems.push({ label:'Atsarginė kopija (eksportas)', icon:'download', onClick:exportData });
+      mitems.push({ label:'Atkurti iš kopijos', icon:'upload', onClick:importData });
       openSheet('Menu', mitems);
       break;
     }
@@ -999,6 +1038,9 @@ document.addEventListener('click', function(ev){
     case 'restMinus': { restEnd = Math.max(Date.now(), restEnd-15000); renderRest(); break; }
     case 'finishSession': finishSession(); break;
     case 'openHistory': go('history'); break;
+    case 'tab': { var v=el.getAttribute('data-view'); if(top().view!==v) reset(v); break; }
+    case 'browseLib': go('library'); break;
+    case 'signout': cloudSignOut(); break;
     case 'histOpen': histOpen(id); break;
   }
 });
