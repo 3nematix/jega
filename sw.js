@@ -1,6 +1,6 @@
 /* Jėga service worker — network-first app shell (always fresh online),
    cache fallback offline, runtime-cached exercise thumbnails. */
-const VERSION = 'jega-v6';
+const VERSION = 'jega-v7';
 const SHELL = VERSION + '-shell';
 const THUMBS = VERSION + '-media';
 
@@ -8,7 +8,9 @@ const SHELL_ASSETS = [
   './',
   './index.html',
   './app.js',
+  './boot.js',
   './exercises.js',
+  './assets/vendor/supabase.js',
   './manifest.webmanifest',
   './assets/icon-192.png',
   './assets/icon-512.png',

@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'self'; form-action 'self'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jėga</title>
 <meta name="description" content="Your own workout routine planner.">
-<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#141311" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0d12" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -305,6 +306,15 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .prow:last-child{border-bottom:none}
 .prow .pd{color:var(--muted);font-size:14px}
 .prow .pv{font-weight:700;font-size:15px}
+/* ---- login gate ---- */
+.authwrap{min-height:82vh;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:380px;margin:0 auto;padding:40px 4px;text-align:center}
+.authlogo{width:74px;height:74px;border-radius:20px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)}
+.authlogo svg{width:38px;height:38px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.authtitle{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-top:18px}
+.authsub{color:var(--muted);font-size:15px;margin:6px 0 26px}
+.authfield{margin-bottom:12px;text-align:left}
+.authbtn{margin-top:6px}
+.authtoggle{margin-top:10px;border:none;background:transparent;color:var(--accent);font-weight:700}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -312,24 +322,9 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 <div class="app" id="app"></div>
 <div id="layer"></div>
 <div class="toast" id="toast"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0"></script>
+<script src="assets/vendor/supabase.js"></script>
 <script src="exercises.js"></script>
 <script src="app.js"></script>
-<script>
-// Auto-update: always run the latest version, no manual cache clearing.
-if('serviceWorker' in navigator){
-  var _refreshing=false;
-  navigator.serviceWorker.addEventListener('controllerchange',function(){
-    if(_refreshing) return; _refreshing=true; window.location.reload();
-  });
-  window.addEventListener('load',function(){
-    navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
-      reg.update();
-      setInterval(function(){ reg.update(); }, 30*60*1000);
-      document.addEventListener('visibilitychange',function(){ if(!document.hidden) reg.update(); });
-    }).catch(function(){});
-  });
-}
-</script>
+<script src="boot.js"></script>
 </body>
 </html>

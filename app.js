@@ -301,6 +301,11 @@ function topbar(opts){
 var elapsedTimer = null;
 function render(){
   if(elapsedTimer){ clearInterval(elapsedTimer); elapsedTimer = null; }
+  // Login gate: when cloud is configured, the app requires sign-in.
+  if(CLOUD_ON && !cloudUser){
+    if(restEl && restEl.classList.contains('show')) hideRest();
+    return authReady ? renderAuth() : renderAuthLoading();
+  }
   var t = top();
   if(t.view!=='session' && restEl && restEl.classList.contains('show')) hideRest();
   if(t.view==='home') return renderHome();
@@ -896,13 +901,9 @@ document.addEventListener('click', function(ev){
         { label:'New folder', icon:'folderPlus', onClick:function(){ openDialog({ title:'New Folder', placeholder:'Folder name', okLabel:'Create', onOk:function(v){ if(!v) return; db.folders.push({id:uid(), name:v, collapsed:false}); save(); render(); } }); } },
         { label:'Load 5-day program', icon:'doc', onClick:loadProgram }
       ];
-      if(CLOUD_ON){
-        if(cloudUser){
-          mitems.push({ label:'Sync now', icon:'download', onClick:cloudPull });
-          mitems.push({ label:'Sign out ('+(cloudUser.email||'')+')', icon:'upload', onClick:cloudSignOut });
-        } else {
-          mitems.push({ label:'Sign in to sync', icon:'upload', onClick:openAuthDialog });
-        }
+      if(CLOUD_ON && cloudUser){
+        mitems.push({ label:'Sync now', icon:'download', onClick:cloudPull });
+        mitems.push({ label:'Atsijungti ('+(cloudUser.email||'')+')', icon:'upload', onClick:cloudSignOut });
       }
       mitems.push({ label:'Backup data (export)', icon:'download', onClick:exportData });
       mitems.push({ label:'Restore from backup', icon:'upload', onClick:importData });
@@ -944,6 +945,8 @@ document.addEventListener('click', function(ev){
     }
     case 'openEx': exTab='howto'; go('exercise', {exId:exId}); break;
     case 'exTab': { exTab = el.getAttribute('data-tab')==='progress' ? 'progress' : 'howto'; render(); break; }
+    case 'authSubmit': authSubmit(); break;
+    case 'authToggle': { authMode = authMode==='signup' ? 'signin' : 'signup'; renderAuth(); break; }
     case 'edit': draft=null; go('editor', {id:id}); break;
 
     /* editor */
@@ -1085,24 +1088,75 @@ document.addEventListener('change', function(ev){
 /* --------------------------------------------------------- CLOUD SYNC */
 var CLOUD = { url:'https://uaehcpbxulqhgqnczqha.supabase.co', key:'sb_publishable_GIFh0fn65FGxp8d8MB9FjA_1Opaa-EW' };
 var CLOUD_ON = /^https:\/\/[a-z0-9]+\.supabase\.(co|in)/.test(CLOUD.url);
-var supa = null, cloudUser = null, pushTimer = null, pushing = false;
+var supa = null, cloudUser = null, pushTimer = null, authReady = false, authMode = 'signin';
 
 function cloudUpdatedAt(){ try{ return +localStorage.getItem('jega.updatedAt') || 0; }catch(e){ return 0; } }
 function setCloudUpdatedAt(ms){ try{ localStorage.setItem('jega.updatedAt', String(ms)); }catch(e){} }
+function setLocalDb(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){} }
+function resetLocal(){ // wipe this device's cache so accounts never mix
+  db = { folders:[], routines:[], history:[] }; session = null; sessOpen = null;
+  try{ localStorage.removeItem(KEY); localStorage.removeItem('jega.updatedAt'); localStorage.removeItem(SKEY); }catch(e){}
+}
 
 function cloudInit(){
-  if(!CLOUD_ON || !window.supabase) return;
-  try{ supa = window.supabase.createClient(CLOUD.url, CLOUD.key, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false } }); }catch(e){ supa = null; return; }
+  if(!CLOUD_ON) return;
+  if(!window.supabase){ authReady = true; render(); return; }
+  try{ supa = window.supabase.createClient(CLOUD.url, CLOUD.key, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false } }); }catch(e){ supa = null; authReady = true; render(); return; }
   supa.auth.onAuthStateChange(function(ev, sess){
     cloudUser = sess ? sess.user : null;
-    if((ev==='SIGNED_IN' || ev==='INITIAL_SESSION') && cloudUser) cloudPull();
-    if(top().view==='home'){ try{ renderHome(); }catch(e){} }
+    authReady = true;
+    if(cloudUser){
+      var lastUid = null; try{ lastUid = localStorage.getItem('jega.uid'); }catch(e){}
+      if(lastUid === cloudUser.id){
+        if(ev==='SIGNED_IN' || ev==='INITIAL_SESSION') cloudPull();
+      } else if(lastUid == null){
+        // first sign-in on this device: claim existing local data for this account
+        try{ localStorage.setItem('jega.uid', cloudUser.id); }catch(e){}
+        cloudAdoptOrMigrate();
+      } else {
+        // a different account signed in: never mix data, wipe + adopt cloud
+        resetLocal();
+        try{ localStorage.setItem('jega.uid', cloudUser.id); }catch(e){}
+        cloudPullOrSeed();
+      }
+    } else {
+      try{ localStorage.removeItem('jega.uid'); }catch(e){}
+    }
+    render();
   });
 }
 function schedulePush(){
   if(!CLOUD_ON || !supa || !cloudUser) return;
   clearTimeout(pushTimer);
   pushTimer = setTimeout(function(){ cloudPush(); }, 1200);
+}
+function cloudPullOrSeed(){
+  if(!supa || !cloudUser) return;
+  supa.from('user_data').select('data').eq('user_id', cloudUser.id).maybeSingle().then(function(r){
+    var remote = (!r.error && r.data) ? r.data.data : null;
+    if(remote && remote.db){
+      db = remote.db; if(!db.history) db.history = [];
+      setLocalDb(); setCloudUpdatedAt(remote.updatedAt || Date.now());
+    } else {
+      seed(); cloudPush(); // brand-new account: default program, uploaded
+    }
+    render();
+  }, function(){ render(); });
+}
+function cloudAdoptOrMigrate(){
+  // first sign-in on this device: adopt cloud if it has data, else migrate local data up
+  if(!supa || !cloudUser) return;
+  supa.from('user_data').select('data').eq('user_id', cloudUser.id).maybeSingle().then(function(r){
+    var remote = (!r.error && r.data) ? r.data.data : null;
+    if(remote && remote.db && (remote.updatedAt||0) >= cloudUpdatedAt()){
+      db = remote.db; if(!db.history) db.history = [];
+      setLocalDb(); setCloudUpdatedAt(remote.updatedAt || Date.now());
+    } else {
+      if(!db.routines || !db.routines.length) seed();
+      cloudPush(); // keep existing local data, upload it to this account
+    }
+    render();
+  }, function(){ render(); });
 }
 function cloudPull(){
   if(!supa || !cloudUser) return;
@@ -1111,9 +1165,8 @@ function cloudPull(){
     var remote = r.data && r.data.data;
     if(remote && remote.db && (remote.updatedAt||0) > cloudUpdatedAt()){
       db = remote.db; if(!db.history) db.history = [];
-      try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){}
-      setCloudUpdatedAt(remote.updatedAt);
-      render(); toast('Atsiųsta iš debesies');
+      setLocalDb(); setCloudUpdatedAt(remote.updatedAt);
+      render();
     } else {
       cloudPush();
     }
@@ -1125,7 +1178,7 @@ function cloudPush(){
   supa.from('user_data').upsert(payload).then(function(){}, function(){});
 }
 function cloudSignIn(email, pass, mode){
-  if(!supa){ toast('Debesis neprijungtas'); return; }
+  if(!supa){ toast('Nėra ryšio su serveriu'); return; }
   var pr = (mode==='signup')
     ? supa.auth.signUp({ email:email, password:pass })
     : supa.auth.signInWithPassword({ email:email, password:pass });
@@ -1135,32 +1188,43 @@ function cloudSignIn(email, pass, mode){
     toast(mode==='signup' ? 'Paskyra sukurta' : 'Prisijungta');
   }, function(){ toast('Tinklo klaida'); });
 }
-function cloudSignOut(){ if(supa) supa.auth.signOut().then(function(){ cloudUser=null; toast('Atsijungta'); if(top().view==='home') renderHome(); }); }
-
-function openAuthDialog(){
-  var h = '<div class="dlg-back" data-close="1"><div class="dlg">'
-    + '<h3>Prisijungti</h3><p>Sinchronizuok duomenis tarp įrenginių.</p>'
-    + '<input class="input" id="authEmail" type="email" placeholder="El. paštas" autocomplete="username" style="margin-bottom:10px">'
-    + '<input class="input" id="authPass" type="password" placeholder="Slaptažodis (min 6)" autocomplete="current-password" style="margin-bottom:16px">'
-    + '<div class="btn-row"><button class="btn ghost" data-auth="signup">Sukurti</button>'
-    + '<button class="btn primary" data-auth="signin">Prisijungti</button></div></div></div>';
-  layer.innerHTML = h;
-  var backEl = layer.querySelector('.dlg-back');
-  requestAnimationFrame(function(){ backEl.classList.add('show'); });
-  var em = document.getElementById('authEmail'); if(em) em.focus();
-  backEl.addEventListener('click', function(ev){
-    var b = ev.target.closest('[data-auth]');
-    if(b){
-      var email = (document.getElementById('authEmail').value||'').trim();
-      var pass = document.getElementById('authPass').value||'';
-      if(!email || pass.length<6){ toast('Įvesk el. paštą ir slaptažodį (min 6)'); return; }
-      backEl.classList.remove('show'); setTimeout(closeLayer, 180);
-      cloudSignIn(email, pass, b.getAttribute('data-auth')==='signup' ? 'signup' : 'signin');
-      return;
-    }
-    if(ev.target.getAttribute('data-close')){ backEl.classList.remove('show'); setTimeout(closeLayer, 180); }
+function cloudSignOut(){
+  if(!supa) return;
+  supa.auth.signOut().then(function(){
+    cloudUser = null; resetLocal();
+    try{ localStorage.removeItem('jega.uid'); }catch(e){}
+    nav = [{ view:'home' }]; render();
   });
 }
+
+/* ---- login gate screens ---- */
+function renderAuthLoading(){
+  app.innerHTML = '<div class="authwrap"><div class="authlogo">'+svg('dumbbell')+'</div>'
+    + '<div class="authsub" style="margin-top:16px">Kraunama…</div></div>';
+}
+function renderAuth(){
+  var signup = authMode==='signup';
+  app.innerHTML = '<div class="authwrap">'
+    + '<div class="authlogo">'+svg('dumbbell')+'</div>'
+    + '<h1 class="authtitle">Jėga</h1>'
+    + '<p class="authsub">'+(signup?'Sukurk paskyrą ir sek savo progresą':'Prisijunk prie savo paskyros')+'</p>'
+    + '<input class="input authfield" id="authEmail" type="email" inputmode="email" placeholder="El. paštas" autocomplete="username" autocapitalize="none" spellcheck="false">'
+    + '<input class="input authfield" id="authPass" type="password" placeholder="Slaptažodis (min 6)" autocomplete="'+(signup?'new-password':'current-password')+'">'
+    + '<button class="btn primary authbtn" data-act="authSubmit">'+(signup?'Sukurti paskyrą':'Prisijungti')+'</button>'
+    + '<button class="btn ghost authtoggle" data-act="authToggle">'+(signup?'Jau turi paskyrą? Prisijunk':'Neturi paskyros? Sukurk')+'</button>'
+    + '</div>';
+}
+function authSubmit(){
+  var em = document.getElementById('authEmail'), pw = document.getElementById('authPass');
+  var email = ((em && em.value) || '').trim(), pass = (pw && pw.value) || '';
+  if(!email || pass.length<6){ toast('Įvesk el. paštą ir slaptažodį (min 6)'); return; }
+  cloudSignIn(email, pass, authMode==='signup' ? 'signup' : 'signin');
+}
+
+// Enter submits the login form
+document.addEventListener('keydown', function(ev){
+  if(ev.key==='Enter' && (ev.target.id==='authEmail' || ev.target.id==='authPass')){ ev.preventDefault(); authSubmit(); }
+});
 
 render();
 cloudInit();
