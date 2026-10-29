@@ -97,11 +97,18 @@ function seed(){
   save();
 }
 function loadProgram(){
-  if(db.folders.some(function(f){return f.name===PROGRAM_FOLDER;})){ toast('Program jau įkelta'); return; }
   var p = buildProgram();
-  db.folders.push(p.folder);
-  p.routines.forEach(function(r){ db.routines.push(r); });
-  save(); reset('home'); toast('Programa įkelta');
+  // find or create the program folder
+  var folder = db.folders.filter(function(f){ return f.name===PROGRAM_FOLDER; })[0];
+  if(!folder){ folder = p.folder; db.folders.push(folder); }
+  var added = 0;
+  p.routines.forEach(function(r){
+    if(!db.routines.some(function(x){ return x.name===r.name; })){
+      r.folderId = folder.id; db.routines.push(r); added++;
+    }
+  });
+  save(); reset('home');
+  toast(added ? ('Atstatyta '+added+' treniruot'+(added===1?'ė':'ės')) : 'Programa jau pilna');
 }
 if(!load()) seed();
 if(!db.history) db.history = [];
