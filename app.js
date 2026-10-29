@@ -527,6 +527,61 @@ function libRow(e, picker){
 }
 
 /* -- Exercise detail -- */
+/* ---- per-exercise progress ---- */
+function exerciseProgress(exId){
+  var out = [];
+  db.history.forEach(function(hh){
+    (hh.entries||[]).forEach(function(en){
+      if(en.exId===exId && en.topKg){
+        var v = parseFloat(String(en.topKg).replace(',','.'));
+        if(!isNaN(v)) out.push({ date:hh.date, topKg:v });
+      }
+    });
+  });
+  out.sort(function(a,b){ return a.date-b.date; });
+  return out;
+}
+function weightChart(data){
+  var W=320, H=160, padL=30, padB=24, padT=12, padR=10;
+  var vals = data.map(function(d){return d.topKg;});
+  var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+  if(min===max){ min = Math.max(0, min-5); max = max+5; }
+  var n = data.length;
+  var X=function(i){ return n===1 ? (W/2) : padL + (i/(n-1))*(W-padL-padR); };
+  var Y=function(v){ return H-padB - ((v-min)/(max-min))*(H-padB-padT); };
+  var pts = data.map(function(d,i){ return [X(i), Y(d.topKg)]; });
+  var line = pts.map(function(p,i){ return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); }).join(' ');
+  var area = 'M'+pts[0][0].toFixed(1)+' '+(H-padB)+' '+pts.map(function(p){return 'L'+p[0].toFixed(1)+' '+p[1].toFixed(1);}).join(' ')+' L'+pts[n-1][0].toFixed(1)+' '+(H-padB)+' Z';
+  var dots = pts.map(function(p,i){ var last=i===n-1; return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+(last?4:2.6)+'" fill="var(--accent)"/>'; }).join('');
+  var labels = '<text x="2" y="'+(Y(max)+3.5)+'" fill="var(--muted)" font-size="10">'+fmtVol(max)+'</text>'
+             + '<text x="2" y="'+(Y(min)+3.5)+'" fill="var(--muted)" font-size="10">'+fmtVol(min)+'</text>';
+  return '<div class="chartbox"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'
+    + '<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'" stroke="var(--line)" stroke-width="1"/>'
+    + (n>1?'<path d="'+area+'" fill="var(--accent)" opacity="0.1"/>':'')
+    + (n>1?'<path d="'+line+'" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>':'')
+    + dots + labels + '</svg></div>';
+}
+function progressTab(exId){
+  var data = exerciseProgress(exId);
+  if(!data.length){
+    return '<div class="empty" style="padding:30px 18px">'+svg('hist')+'<div>Dar nėra duomenų.<br>Treniruotės metu įvesk „Top weight", ir čia matysi svorio augimą.</div></div>';
+  }
+  var best = Math.max.apply(null, data.map(function(d){return d.topKg;}));
+  var h = '<div class="stats" style="margin-top:14px">'
+    + '<div class="stat"><div class="n tnum">'+fmtVol(best)+'</div><div class="l">Geriausias kg</div></div>'
+    + '<div class="stat"><div class="n tnum">'+fmtVol(data[data.length-1].topKg)+'</div><div class="l">Paskutinis kg</div></div>'
+    + '<div class="stat"><div class="n tnum">'+data.length+'</div><div class="l">Kartų</div></div></div>';
+  h += '<div class="dlabel" style="margin:16px 0 8px">Svoris laike</div>' + weightChart(data);
+  h += '<div class="dlabel" style="margin:18px 0 8px">Paskutinės treniruotės</div><div class="card" style="padding:2px 14px">';
+  data.slice().reverse().slice(0,10).forEach(function(d){
+    var ds = new Date(d.date).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+    h += '<div class="prow"><span class="pd">'+esc(ds)+'</span><span class="pv tnum">'+fmtVol(d.topKg)+' kg</span></div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+var exTab = 'howto';
 function renderExercise(exId){
   var e = byId[exId]; if(!e) return back();
   var h = topbar({ title:e.name, sub:true, back:true });
@@ -545,13 +600,19 @@ function renderExercise(exId){
     + '<div class="row"><span class="k">Secondary</span><span class="v">'+ ((e.secondary&&e.secondary.length)? e.secondary.map(function(m){return esc(MUSCLE[m]||m);}).join(', ') : '—') +'</span></div>'
     + '<div class="row"><span class="k">Type</span><span class="v">'+esc((e.type||'').replace(/_/g,' '))+'</span></div>'
     + '</div>';
-  h += '<div class="tabs"><button class="tab active">How to</button></div>';
-  if(e.howto && e.howto.length){
+  var tab = (exTab==='progress') ? 'progress' : 'howto';
+  h += '<div class="tabs">'
+    + '<button class="tab'+(tab==='howto'?' active':'')+'" data-act="exTab" data-tab="howto">Kaip atlikti</button>'
+    + '<button class="tab'+(tab==='progress'?' active':'')+'" data-act="exTab" data-tab="progress">Progresas</button>'
+    + '</div>';
+  if(tab==='progress'){
+    h += progressTab(exId);
+  } else if(e.howto && e.howto.length){
     h += '<div class="steps">';
     e.howto.forEach(function(s){ h += '<div class="step"><div class="num"></div><p>'+esc(s)+'</p></div>'; });
     h += '</div>';
   } else {
-    h += '<div class="empty" style="padding:22px">No instructions for this exercise.</div>';
+    h += '<div class="empty" style="padding:22px">Nėra instrukcijų šiam pratimui.</div>';
   }
   h += '</div>';
   app.innerHTML = h;
@@ -673,6 +734,14 @@ function renderHistory(){
   h += '<div class="screen flush">';
   if(!db.history.length){
     h += '<div class="empty">'+svg('hist')+'<div>No workouts logged yet.<br>Open a routine and press Start.</div></div>';
+  } else {
+    var now=Date.now(), wk=now-7*864e5, mo=now-30*864e5;
+    var wkN=db.history.filter(function(x){return x.date>=wk;}).length;
+    var moN=db.history.filter(function(x){return x.date>=mo;}).length;
+    h += '<div class="stats" style="margin:6px 0 16px">'
+      + '<div class="stat"><div class="n tnum">'+db.history.length+'</div><div class="l">Iš viso</div></div>'
+      + '<div class="stat"><div class="n tnum">'+wkN+'</div><div class="l">Ši savaitė</div></div>'
+      + '<div class="stat"><div class="n tnum">'+moN+'</div><div class="l">Šis mėnuo</div></div></div>';
   }
   db.history.forEach(function(e){
     var maxes = (e.entries||[]).filter(function(x){return x.topKg;}).length;
@@ -873,7 +942,8 @@ document.addEventListener('click', function(ev){
       routineMenu(id);
       break;
     }
-    case 'openEx': go('exercise', {exId:exId}); break;
+    case 'openEx': exTab='howto'; go('exercise', {exId:exId}); break;
+    case 'exTab': { exTab = el.getAttribute('data-tab')==='progress' ? 'progress' : 'howto'; render(); break; }
     case 'edit': draft=null; go('editor', {id:id}); break;
 
     /* editor */

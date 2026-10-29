@@ -1,6 +1,6 @@
 /* Jėga service worker — network-first app shell (always fresh online),
    cache fallback offline, runtime-cached exercise thumbnails. */
-const VERSION = 'jega-v5';
+const VERSION = 'jega-v6';
 const SHELL = VERSION + '-shell';
 const THUMBS = VERSION + '-media';
 
