@@ -56,7 +56,7 @@ img{max-width:100%; display:block}
 .app{position:fixed; inset:0; max-width:560px; margin:0 auto; display:flex; flex-direction:column; background:var(--bg)}
 .appbar{flex:none; background:var(--bg); padding-top:env(safe-area-inset-top,0); z-index:2}
 .appscroll{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain}
-.appfoot{flex:none; background:var(--bg); padding-bottom:env(safe-area-inset-bottom,0); z-index:2}
+.appfoot{flex:none; background:var(--bg); padding-bottom:max(8px,env(safe-area-inset-bottom,0)); z-index:2}
 
 /* ---- Top bar ---- */
 .topbar{
@@ -246,7 +246,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .toast{position:fixed;left:50%;bottom:calc(26px + env(safe-area-inset-bottom,0));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:12px;font-weight:600;font-size:14.5px;z-index:70;opacity:0;transition:all .22s;pointer-events:none;box-shadow:var(--shadow);max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .sticky-foot{display:flex;justify-content:center}
-.sticky-foot .inner{width:100%;max-width:560px;padding:10px max(16px,env(safe-area-inset-left,0)) 12px;background:var(--bg);border-top:1px solid var(--line)}
+.sticky-foot .inner{width:100%;max-width:560px;padding:10px max(16px,env(safe-area-inset-left,0)) 2px;background:var(--bg);border-top:1px solid var(--line)}
 .foot2{display:flex;gap:10px}
 .foot2 .btn.primary{flex:1}
 .foot2 .btn.sq{flex:0 0 auto;width:auto;padding-left:16px;padding-right:16px}
@@ -317,7 +317,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 .authtoggle{margin-top:10px;border:none;background:transparent;color:var(--accent);font-weight:700}
 /* ---- bottom tab bar ---- */
 .screen.tabbed{padding-block-end:24px}
-.tabbar{display:flex;justify-content:center;padding:8px 12px;border-top:1px solid var(--line);background:var(--bg)}
+.tabbar{display:flex;justify-content:center;padding:7px 12px 2px;border-top:1px solid var(--line);background:var(--bg)}
 .tabbar .inner{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:5px}
 .tabbar .tb{display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:700;padding:7px 18px;border-radius:999px;min-width:82px}
 .tabbar .tb.active{color:var(--accent);background:var(--accent-weak)}
