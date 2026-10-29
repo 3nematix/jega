@@ -158,8 +158,25 @@ function fmtClock(sec){
 
 /* ------------------------------------------------------------- utilities */
 var app = document.getElementById('app');
+var barSlot = document.getElementById('bar');
+var scrollSlot = document.getElementById('scroll');
+var footSlot = document.getElementById('foot');
 var layer = document.getElementById('layer');
 var nav = [{ view:'home' }];
+var lastMountView = null;
+// Distribute a full view string into the fixed shell: top bar, scrolling middle, bottom bar.
+function mount(h){
+  var tmp = document.createElement('div'); tmp.innerHTML = h;
+  var tb = tmp.querySelector('.topbar');
+  var ft = tmp.querySelector('.tabbar, .sticky-foot');
+  barSlot.innerHTML = tb ? tb.outerHTML : '';
+  if(tb) tb.parentNode.removeChild(tb);
+  footSlot.innerHTML = ft ? ft.outerHTML : '';
+  if(ft) ft.parentNode.removeChild(ft);
+  scrollSlot.innerHTML = tmp.innerHTML;
+  var v; try{ v = top().view; }catch(e){ v = null; }
+  if(v !== lastMountView){ try{ scrollSlot.scrollTop = 0; }catch(e){} lastMountView = v; }
+}
 function top(){ return nav[nav.length-1]; }
 function go(view, params){ nav.push(Object.assign({view:view}, params||{})); render(); scrollTop(); }
 function back(){ if(nav.length>1){ nav.pop(); render(); } }
@@ -376,7 +393,7 @@ function renderHome(){
   un.forEach(function(r){ h += routineCard(r); });
   h += '</div>';
   h += bottomBar('home');
-  app.innerHTML = h;
+  mount(h);
 }
 function routineCard(r){
   var has = r.exercises && r.exercises.length;
@@ -447,7 +464,7 @@ function renderRoutine(id){
     h += '<button class="btn primary" data-act="edit" data-id="'+r.id+'">'+svg('edit')+'Edit Routine</button>';
   }
   h += '</div></div></div>';
-  app.innerHTML = h;
+  mount(h);
   bm.paint(app);
 }
 
@@ -487,7 +504,7 @@ function renderEditor(id){
   h += '</div>';
   h += '<div class="sticky-foot"><div class="inner">'
     + '<button class="btn primary" data-act="saveRoutine">'+svg('check')+'Save Routine</button></div></div>';
-  app.innerHTML = h;
+  mount(h);
 }
 function commitName(){ var el = document.getElementById('rname'); if(el && draft) draft.name = el.value; }
 
@@ -507,7 +524,7 @@ function renderLibrary(){
   if(picker){
     h += '<div class="sticky-foot"><div class="inner"><button class="btn primary" data-act="back">'+svg('check')+'Done</button></div></div>';
   }
-  app.innerHTML = h;
+  mount(h);
   renderLibListReal();
 }
 function filteredExercises(){
@@ -639,7 +656,7 @@ function renderExercise(exId){
     h += '<div class="empty" style="padding:22px">Nėra instrukcijų šiam pratimui.</div>';
   }
   h += '</div>';
-  app.innerHTML = h;
+  mount(h);
 }
 
 /* --------------------------------------------------------- SESSION view */
@@ -674,7 +691,7 @@ function renderSession(){
   });
   h += '</div>';
   h += '<div class="sticky-foot"><div class="inner"><button class="btn primary" data-act="finishSession">'+svg('flag')+'Finish Workout</button></div></div>';
-  app.innerHTML = h;
+  mount(h);
   elapsedTimer = setInterval(function(){
     var el = document.getElementById('elapsed');
     if(!el || !session){ clearInterval(elapsedTimer); elapsedTimer=null; return; }
@@ -778,7 +795,7 @@ function renderHistory(){
   });
   h += '</div>';
   h += bottomBar('history');
-  app.innerHTML = h;
+  mount(h);
 }
 /* --------------------------------------------------------- PROFILE view */
 function renderProfile(){
@@ -806,7 +823,7 @@ function renderProfile(){
   if(CLOUD_ON && cloudUser) h += '<button class="prow2 danger" data-act="signout">'+svg('upload')+'<span>Atsijungti</span></button>';
   h += '</div>';
   h += bottomBar('profile');
-  app.innerHTML = h;
+  mount(h);
 }
 function histOpen(id){
   var e = db.history.filter(function(x){return x.id===id;})[0]; if(!e) return;
@@ -1248,12 +1265,12 @@ function cloudSignOut(){
 
 /* ---- login gate screens ---- */
 function renderAuthLoading(){
-  app.innerHTML = '<div class="authwrap"><div class="authlogo">'+svg('dumbbell')+'</div>'
-    + '<div class="authsub" style="margin-top:16px">Kraunama…</div></div>';
+  mount('<div class="authwrap"><div class="authlogo">'+svg('dumbbell')+'</div>'
+    + '<div class="authsub" style="margin-top:16px">Kraunama…</div></div>');
 }
 function renderAuth(){
   var signup = authMode==='signup';
-  app.innerHTML = '<div class="authwrap">'
+  mount('<div class="authwrap">'
     + '<div class="authlogo">'+svg('dumbbell')+'</div>'
     + '<h1 class="authtitle">Jėga</h1>'
     + '<p class="authsub">'+(signup?'Sukurk paskyrą ir sek savo progresą':'Prisijunk prie savo paskyros')+'</p>'
@@ -1261,7 +1278,7 @@ function renderAuth(){
     + '<input class="input authfield" id="authPass" type="password" placeholder="Slaptažodis (min 6)" autocomplete="'+(signup?'new-password':'current-password')+'">'
     + '<button class="btn primary authbtn" data-act="authSubmit">'+(signup?'Sukurti paskyrą':'Prisijungti')+'</button>'
     + '<button class="btn ghost authtoggle" data-act="authToggle">'+(signup?'Jau turi paskyrą? Prisijunk':'Neturi paskyros? Sukurk')+'</button>'
-    + '</div>';
+    + '</div>');
 }
 function authSubmit(){
   var em = document.getElementById('authEmail'), pw = document.getElementById('authPass');
